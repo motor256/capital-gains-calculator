@@ -53,8 +53,12 @@ def get_closest_price(symbol: str, target_date: str | date) -> Decimal:
         else:
             # Dynamic range for unknown symbols
             date_obj = datetime.strptime(target_date_str, "%Y-%m-%d").date()
-            start = (date_obj - timedelta(days=DEFAULT_LOOKBACK_DAYS)).strftime("%Y-%m-%d")
-            end = (date_obj + timedelta(days=DEFAULT_LOOKAHEAD_DAYS)).strftime("%Y-%m-%d")
+            start = (date_obj - timedelta(days=DEFAULT_LOOKBACK_DAYS)).strftime(
+                "%Y-%m-%d"
+            )
+            end = (date_obj + timedelta(days=DEFAULT_LOOKAHEAD_DAYS)).strftime(
+                "%Y-%m-%d"
+            )
             print(f"Fetching {symbol} historical prices ({start} to {end})...")
 
         _price_cache[symbol] = _fetch_price_data(symbol, start, end)
@@ -66,7 +70,7 @@ def get_closest_price(symbol: str, target_date: str | date) -> Decimal:
 
 def _fetch_price_data(ticker: str, start_date: str, end_date: str) -> pd.DataFrame:
     """Fetch historical price data from yfinance."""
-    stock_data = yf.download(ticker, start=start_date, end=end_date)
+    stock_data: pd.DataFrame = yf.download(ticker, start=start_date, end=end_date)
     if stock_data.empty:
         msg = f"No data found for ticker '{ticker}' from {start_date} to {end_date}."
         raise RuntimeError(msg)
@@ -102,17 +106,16 @@ def _fetch_closest_close_price(data: pd.DataFrame, target_date: str) -> float:
         raise RuntimeError(msg)
 
     closest_data_row = data.loc[closest_date]
-    closest_close_price = float(closest_data_row["Close"].iloc[0])
+    close_value = closest_data_row["Close"].iloc[0]
 
-    if closest_close_price is None:
+    # Check if value is missing/NaN before converting
+    if pd.isna(close_value):
         msg = f"Could not find price for {target_date}"
         raise RuntimeError(msg)
 
-    return closest_close_price
+    return float(close_value)
 
 
 def clear_cache() -> None:
     """Clear the price cache (useful for testing)."""
     _price_cache.clear()
-
-

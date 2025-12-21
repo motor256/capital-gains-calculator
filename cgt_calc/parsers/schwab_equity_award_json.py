@@ -61,10 +61,11 @@ class FieldNames:
     award_id: str = "AwardId"
     date: str = "Date"
     sale_price: str = "SalePrice"
-    purchase_fair_market_value: str = "PurchaseFairMarketValue"  # 3 fields required for ESPP transactions
+    purchase_fair_market_value: str = (
+        "PurchaseFairMarketValue"  # 3 fields required for ESPP transactions
+    )
     purchase_date: str = "PurchaseDate"
     subscription_date: str = "SubscriptionDate"
-
 
     def __post_init__(self, schema_version: int) -> None:
         """Set correct field names if the schema is not the default one.
@@ -163,8 +164,6 @@ def action_from_str(label: str, file: Path) -> ActionType:
     if label == "Wire Funds Received":
         return ActionType.WIRE_FUNDS_RECEIVED
 
-
-
     raise ParsingError(file, f"Unknown action: {label}")
 
 
@@ -209,6 +208,7 @@ class SchwabTransaction(BrokerTransaction):
 
     def __init__(self, row: JsonRowType, file: Path, field_names: FieldNames) -> None:
         """Create a new SchwabTransaction from a JSON row."""
+        self.file = file
         names = field_names
         description = row[names.description]
         self.raw_action = row[names.action]
@@ -247,8 +247,7 @@ class SchwabTransaction(BrokerTransaction):
                 if amount == Decimal(0):
                     amount = price * quantity
                 description = (
-                    f"ESPP from Subscription Date "
-                    f"{details[names.subscription_date]} "
+                    f"ESPP from Subscription Date {details[names.subscription_date]} "
                 )
             else:
                 date = datetime.datetime.strptime(
@@ -272,7 +271,9 @@ class SchwabTransaction(BrokerTransaction):
 
             # NVIDIA: Schwab exports always have integer quantities for sales.
             # Skip complex decimal inference logic (designed for Google's data quirks).
-            if not _is_integer(quantity) or (symbol in NVIDIA_SYMBOLS and _is_integer(quantity)):
+            if not _is_integer(quantity) or (
+                symbol in NVIDIA_SYMBOLS and _is_integer(quantity)
+            ):
                 price = (amount + fees) / quantity
             else:
                 subtransac_have_quantities = True
@@ -400,8 +401,15 @@ class SchwabTransaction(BrokerTransaction):
         Schwab's data exports have some past transactions corrected for the splits, whereas others are not. That's
         why we fetch historical stock prices and check if transaction was already corrected and correct if not.
         """
+        # This method is only called when symbol is in NVIDIA_SYMBOLS, so it's guaranteed to be non-None
+        assert self.symbol is not None, (
+            "Symbol must be set for NVIDIA split normalization"
+        )
+
         split_factor = 10
-        fetched_price = historical_price_fetcher.get_closest_price(self.symbol, self.date)
+        fetched_price = historical_price_fetcher.get_closest_price(
+            self.symbol, self.date
+        )
 
         if (
             self.date <= datetime.date(2024, 6, 10)
@@ -416,11 +424,10 @@ class SchwabTransaction(BrokerTransaction):
                 price_ratio < SPLIT_PRICE_TOLERANCE_LOWER
             ):
                 raise ParsingError(
-                    None,
+                    self.file,
                     f"Split processing error: updated price {self.price} differs too much "
                     f"from fetched price {fetched_price}. Date: {self.date}",
                 )
-
 
 
 def read_schwab_equity_award_json_transactions(
@@ -460,7 +467,8 @@ def read_schwab_equity_award_json_transactions(
             SchwabTransaction(transac, transactions_file, fields)
             for transac in data[fields.transactions]
             # Skip as not relevant for CGT
-            if transac[fields.action] not in {"Journal", "Wire Transfer", "Lapse", "Tax Withholding", "Dividend"}
+            if transac[fields.action]
+            not in {"Journal", "Wire Transfer", "Lapse", "Tax Withholding", "Dividend"}
         ]
         transactions.reverse()
         return list(transactions)

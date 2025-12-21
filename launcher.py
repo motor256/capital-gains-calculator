@@ -11,14 +11,13 @@ from __future__ import annotations
 from cgt_calc.args_parser import create_parser
 from cgt_calc.main import calculate_cgt
 
-
 # Adjust this list to your own data/files.
 # You can comment/uncomment lines as needed while iterating in the IDE.
 ARG_LIST: list[str] = [
     "--year",
     "2024",
     "--schwab-equity-award-json",
-    "in/EquityAwardsCenter_2017-2024-12-21.json"
+    "in/EquityAwardsCenter_2017-2024-12-21.json",
     # Example Schwab CSV (replace with your own):
     # "--schwab-file",
     # r"C:\path\to\schwab_transactions.csv",
@@ -45,6 +44,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-
-
-
