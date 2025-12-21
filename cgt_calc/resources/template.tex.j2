@@ -211,6 +211,25 @@
 \subsection*{Total capital gain before loss: £\VAR{ "{:,}".format(total_gain.value) }}
 \subsection*{Total capital loss: £\VAR{ "{:,}".format(total_loss.value) }}
 \subsection*{Total capital gain after loss: £\VAR{ "{:,}".format(total_gain.value - total_loss.value) }}
+
+\BLOCK{ set period_summaries = report.sub_period_summaries() }
+\BLOCK{ if period_summaries|length > 1 }
+\vspace{2em}
+\section*{Breakdown by CGT Regime}
+\BLOCK{ for summary in period_summaries }
+\subsection*{\VAR{ summary.label }}
+\textit{\VAR{ summary.start_date.strftime("%d/%m/%Y") } -- \VAR{ summary.end_date.strftime("%d/%m/%Y") }}
+
+\begin{itemize}
+\item Number of disposals: \VAR{ summary.disposal_count }
+\item Disposal proceeds: £\VAR{ "{:,}".format(round_decimal(summary.disposal_proceeds, 2)) }
+\item Allowable costs: £\VAR{ "{:,}".format(round_decimal(summary.allowable_costs, 2)) }
+\item Capital gain: £\VAR{ "{:,}".format(round_decimal(summary.capital_gain, 2)) }
+\item Capital loss: £\VAR{ "{:,}".format(round_decimal(-summary.capital_loss, 2)) }
+\item Total capital gain: £\VAR{ "{:,}".format(round_decimal(summary.total_gain(), 2)) }
+\end{itemize}
+\BLOCK{ endfor }
+\BLOCK{ endif }
 \vspace{2em}
 \section*{Overall - Dividends and Interests}
 \subsection*{Number of dividend distributions: \VAR{ dividend_count.value }}

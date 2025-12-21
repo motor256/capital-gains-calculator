@@ -346,6 +346,24 @@ class PortfolioEntry:
 
 
 @dataclass
+class CapitalGainsSubPeriodSummary:
+    """Summary of capital gains for a sub-period within a tax year."""
+
+    label: str
+    start_date: datetime.date
+    end_date: datetime.date
+    disposal_count: int = 0
+    disposal_proceeds: Decimal = Decimal(0)
+    allowable_costs: Decimal = Decimal(0)
+    capital_gain: Decimal = Decimal(0)
+    capital_loss: Decimal = Decimal(0)
+
+    def total_gain(self) -> Decimal:
+        """Total capital gain for this period."""
+        return self.capital_gain + self.capital_loss
+
+
+@dataclass
 class CapitalGainsReport:
     """Store calculated report."""
 
@@ -372,6 +390,65 @@ class CapitalGainsReport:
                 for entry in entry_list:
                     if entry.rule_type == rule_type:
                         yield entry
+
+    def sub_period_summaries(self) -> list[CapitalGainsSubPeriodSummary]:
+        """Aggregate disposals into CGT regime periods for this tax year.
+
+        Returns a list of summaries, one per period. For tax years without
+        rate changes, returns a single summary covering the entire year.
+        """
+        from .dates import get_tax_year_periods
+
+        periods = get_tax_year_periods(self.tax_year)
+        summaries = [
+            CapitalGainsSubPeriodSummary(
+                label=p.label,
+                start_date=p.start_date,
+                end_date=p.end_date,
+            )
+            for p in periods
+        ]
+
+        def find_period_index(d: datetime.date) -> int | None:
+            for i, p in enumerate(periods):
+                if p.start_date <= d <= p.end_date:
+                    return i
+            return None
+
+        # Iterate through calculation log to find disposals
+        for date_idx, symbols in self.calculation_log.items():
+            idx = find_period_index(date_idx)
+            if idx is None:
+                continue
+            summary = summaries[idx]
+
+            for symbol_key, entries in symbols.items():
+                # Disposal entries are keyed as "sell$SYMBOL"
+                if not symbol_key.startswith("sell$"):
+                    continue
+
+                # Each disposal transaction counts as one disposal
+                summary.disposal_count += 1
+
+                # Aggregate amounts from all calculation entries for this disposal
+                transaction_proceeds = Decimal(0)
+                transaction_gain = Decimal(0)
+
+                for entry in entries:
+                    # Sum proceeds (amount + fees) and gains
+                    transaction_proceeds += entry.amount + entry.fees
+                    transaction_gain += entry.gain
+
+                summary.disposal_proceeds += transaction_proceeds
+                summary.allowable_costs += transaction_proceeds - transaction_gain
+
+                # Split gain into positive (capital_gain) and negative (capital_loss)
+                if transaction_gain > 0:
+                    summary.capital_gain += transaction_gain
+                else:
+                    summary.capital_loss += transaction_gain
+
+        return summaries
 
     def total_unrealized_gains(self) -> Decimal:
         """Total unrealized gains across portfolio."""
@@ -481,6 +558,23 @@ class CapitalGainsReport:
             out += f"Taxable capital gain: £{self.taxable_gain()}\n"
         else:
             out += "WARNING: Missing allowance for this tax year\n"
+
+        # Show breakdown by CGT regime periods if there are multiple periods
+        summaries = self.sub_period_summaries()
+        if len(summaries) > 1:
+            out += "\nBreakdown by CGT regime:\n"
+            for summary in summaries:
+                out += f"\n{summary.label} ({summary.start_date.strftime('%d/%m/%Y')} - {summary.end_date.strftime('%d/%m/%Y')}):\n"
+                out += f"  Number of disposals: {summary.disposal_count}\n"
+                out += f"  Disposal proceeds: £{round_decimal(summary.disposal_proceeds, 2)}\n"
+                out += (
+                    f"  Allowable costs: £{round_decimal(summary.allowable_costs, 2)}\n"
+                )
+                out += f"  Capital gain: £{round_decimal(summary.capital_gain, 2)}\n"
+                out += f"  Capital loss: £{round_decimal(-summary.capital_loss, 2)}\n"
+                out += (
+                    f"  Total capital gain: £{round_decimal(summary.total_gain(), 2)}\n"
+                )
         if self.show_unrealized_gains:
             total_unrealized_gains = round_decimal(self.total_unrealized_gains(), 2)
             out += f"Total unrealized gains: £{total_unrealized_gains}\n"

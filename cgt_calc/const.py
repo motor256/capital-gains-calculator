@@ -33,6 +33,28 @@ CAPITAL_GAIN_ALLOWANCES: Final[dict[int, int]] = {
     2025: 3000,
 }
 
+# Capital Gains Tax regime change dates per tax year.
+# For each tax_year: sorted list of dates when a new CGT regime starts.
+# Periods are then derived as:
+#   [tax_year_start, first_change_date - 1],
+#   [first_change_date, second_change_date - 1],
+#   ...
+#   [last_change_date, tax_year_end]
+CGT_RATE_CHANGE_DATES: Final[dict[int, list[datetime.date]]] = {
+    # 2024/25 tax year (6 Apr 2024 - 5 Apr 2025):
+    # CGT rate changes on 30 Oct 2024
+    2024: [datetime.date(2024, 10, 30)],
+}
+
+# Human-readable labels for the CGT regimes in each tax year.
+# Number of labels per year must be len(CGT_RATE_CHANGE_DATES[year]) + 1.
+CGT_RATE_PERIOD_LABELS: Final[dict[int, list[str]]] = {
+    2024: [
+        "Pre 30 Oct 2024 CGT regime",  # 6 Apr 2024 - 29 Oct 2024
+        "Post 30 Oct 2024 CGT regime",  # 30 Oct 2024 - 5 Apr 2025
+    ],
+}
+
 # Dividend Tax annual allowance
 # https://www.gov.uk/tax-on-dividends
 DIVIDEND_ALLOWANCES: Final[dict[int, int]] = {
