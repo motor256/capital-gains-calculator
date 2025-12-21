@@ -35,7 +35,6 @@ def read_broker_transactions(
     raw_transactions_file: Path | None,
     vanguard_transactions_file: Path | None,
     eri_raw_file: Path | None,
-    nvda_prices  # m256tr: added NVDA prices for split handling. To be removed later
 ) -> list[BrokerTransaction]:
     """Read transactions for all brokers."""
     transactions = []
@@ -49,8 +48,7 @@ def read_broker_transactions(
 
     if schwab_equity_award_json_transactions_file is not None:
         transactions += read_schwab_equity_award_json_transactions(
-            schwab_equity_award_json_transactions_file,
-            nvda_prices # m256tr: passthrough, to be removed later
+            schwab_equity_award_json_transactions_file
         )
     else:
         LOGGER.debug("No Schwab Equity Award JSON file provided")

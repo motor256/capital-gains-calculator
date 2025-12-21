@@ -9,7 +9,6 @@ import decimal
 from decimal import Decimal
 import logging
 import sys
-from cgt_calc import stock_prices #  m256tr: ugly import - to be removed later
 from typing import TYPE_CHECKING
 
 from . import render_latex
@@ -1385,10 +1384,6 @@ class CapitalGainsCalculator:
 
 def calculate_cgt(args: argparse.Namespace) -> None:
     """Perform all the computations."""
-
-    # m256tr: Fetch nvda prices to deal with split. This is ugly - to be changed first thing once I get it working in principle
-    nvda_prices = stock_prices.fetch_share_prices('NVDA', "2017-01-01", "2024-12-21")
-
     # Read data from input files
     broker_transactions = read_broker_transactions(
         freetrade_transactions_file=args.freetrade_file,
@@ -1401,7 +1396,6 @@ def calculate_cgt(args: argparse.Namespace) -> None:
         raw_transactions_file=args.raw_file,
         vanguard_transactions_file=args.vanguard_file,
         eri_raw_file=args.eri_raw_file,
-        nvda_prices=nvda_prices
     )
     currency_converter = CurrencyConverter(args.exchange_rates_file)
     price_fetcher = CurrentPriceFetcher(currency_converter)
