@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from .const import (
+    DEFAULT_BROKER_TRANSACTIONS_FILE,
     DEFAULT_EXCHANGE_RATES_FILE,
     DEFAULT_ISIN_TRANSLATION_FILE,
     DEFAULT_REPORT_PATH,
@@ -392,6 +393,12 @@ Environment variables:
         "--no-report",
         action="store_true",
         help="do not generate PDF report",
+    )
+
+    output_group.add_argument(
+        "--save-broker-transactions",
+        action="store_true",
+        help=f"save parsed broker transactions to CSV file ({DEFAULT_BROKER_TRANSACTIONS_FILE})",
     )
 
     # General Options

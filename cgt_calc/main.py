@@ -13,9 +13,11 @@ from typing import TYPE_CHECKING
 
 from . import render_latex
 from .args_parser import create_parser
+from .broker_transactions_exporter import save_broker_transactions
 from .const import (
     BED_AND_BREAKFAST_DAYS,
     CAPITAL_GAIN_ALLOWANCES,
+    DEFAULT_BROKER_TRANSACTIONS_FILE,
     DIVIDEND_ALLOWANCES,
     DIVIDEND_DOUBLE_TAXATION_RULES,
     ERI_TAX_DATE_DELTA,
@@ -1397,6 +1399,11 @@ def calculate_cgt(args: argparse.Namespace) -> None:
         vanguard_transactions_file=args.vanguard_file,
         eri_raw_file=args.eri_raw_file,
     )
+
+    # Optionally save parsed broker transactions to CSV
+    if args.save_broker_transactions:
+        save_broker_transactions(broker_transactions, DEFAULT_BROKER_TRANSACTIONS_FILE)
+
     currency_converter = CurrencyConverter(args.exchange_rates_file)
     price_fetcher = CurrentPriceFetcher(currency_converter)
     initial_prices = InitialPrices(args.initial_prices_file)
