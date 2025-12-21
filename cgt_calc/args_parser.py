@@ -12,6 +12,7 @@ from typing import TYPE_CHECKING, Any
 from .const import (
     DEFAULT_BROKER_TRANSACTIONS_FILE,
     DEFAULT_EXCHANGE_RATES_FILE,
+    DEFAULT_HISTORICAL_PRICES_FILE,
     DEFAULT_ISIN_TRANSLATION_FILE,
     DEFAULT_REPORT_PATH,
     DEFAULT_SPIN_OFF_FILE,
@@ -344,6 +345,13 @@ Environment variables:
         default=DEFAULT_SPIN_OFF_FILE,
         help="spin-offs data in CSV format (default: %(default)s)",
     )
+    data_group.add_argument(
+        "--historical-prices-file",
+        type=optional_file_type,
+        metavar="PATH",
+        default=DEFAULT_HISTORICAL_PRICES_FILE,
+        help="historical stock prices cache in CSV format (default: %(default)s)",
+    )
 
     # Calculation Options
     calc_group = parser.add_argument_group("Calculation options")
@@ -367,6 +375,13 @@ Environment variables:
         metavar="TICKER[,TICKER...]",
         default=[],
         help="tickers of bond funds/ETFs whose dividends are taxed as interest in the UK",
+    )
+    calc_group.add_argument(
+        "--no-dividends",
+        dest="show_dividends",
+        action="store_false",
+        default=True,
+        help="exclude dividends and interest calculations from the report",
     )
 
     # Output Options

@@ -15,10 +15,11 @@ from cgt_calc.main import calculate_cgt
 # You can comment/uncomment lines as needed while iterating in the IDE.
 ARG_LIST: list[str] = [
     "--year",
-    "2025",
+    "2020",
     "--schwab-equity-award-json",
     "in/EquityAwardsCenter_2017-2025-12-20.json",
     "--save-broker-transactions",
+    "--no-dividends",
     # Example Schwab CSV (replace with your own):
     # "--schwab-file",
     # r"C:\path\to\schwab_transactions.csv",

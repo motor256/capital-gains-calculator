@@ -21,9 +21,9 @@ import json
 import logging
 from typing import TYPE_CHECKING, Any, Final
 
-from cgt_calc import historical_price_fetcher
 from cgt_calc.const import TICKER_RENAMES
 from cgt_calc.exceptions import ParsingError
+from cgt_calc.historical_price_fetcher import HistoricalPriceFetcher
 from cgt_calc.model import ActionType, BrokerTransaction
 from cgt_calc.util import round_decimal
 
@@ -206,9 +206,16 @@ def _is_integer(number: Decimal) -> bool:
 class SchwabTransaction(BrokerTransaction):
     """Represent single Schwab transaction."""
 
-    def __init__(self, row: JsonRowType, file: Path, field_names: FieldNames) -> None:
+    def __init__(
+        self,
+        row: JsonRowType,
+        file: Path,
+        field_names: FieldNames,
+        price_fetcher: HistoricalPriceFetcher | None = None,
+    ) -> None:
         """Create a new SchwabTransaction from a JSON row."""
         self.file = file
+        self.price_fetcher = price_fetcher or HistoricalPriceFetcher()
         names = field_names
         description = row[names.description]
         self.raw_action = row[names.action]
@@ -407,9 +414,7 @@ class SchwabTransaction(BrokerTransaction):
         )
 
         split_factor = 10
-        fetched_price = historical_price_fetcher.get_closest_price(
-            self.symbol, self.date
-        )
+        fetched_price = self.price_fetcher.get_closest_price(self.symbol, self.date)
 
         if (
             self.date <= datetime.date(2024, 6, 10)
@@ -432,6 +437,7 @@ class SchwabTransaction(BrokerTransaction):
 
 def read_schwab_equity_award_json_transactions(
     transactions_file: Path,
+    price_fetcher: HistoricalPriceFetcher | None = None,
 ) -> list[BrokerTransaction]:
     """Read Schwab transactions from file."""
 
@@ -464,11 +470,11 @@ def read_schwab_equity_award_json_transactions(
             )
 
         transactions = [
-            SchwabTransaction(transac, transactions_file, fields)
+            SchwabTransaction(transac, transactions_file, fields, price_fetcher)
             for transac in data[fields.transactions]
             # Skip as not relevant for CGT
             if transac[fields.action]
-            not in {"Journal", "Wire Transfer", "Lapse", "Tax Withholding", "Dividend"}
+            not in {"Journal", "Wire Transfer", "Lapse", "Tax Withholding"}
         ]
         transactions.reverse()
         return list(transactions)

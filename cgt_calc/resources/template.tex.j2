@@ -147,7 +147,7 @@
 
 \BLOCK{ endfor }
 
-\BLOCK{ if report.calculation_log_yields }
+\BLOCK{ if report.show_dividends and report.calculation_log_yields }
     \clearpage
     \section*{Interest and Dividends Events}
 
@@ -230,6 +230,7 @@
 \end{itemize}
 \BLOCK{ endfor }
 \BLOCK{ endif }
+\BLOCK{ if report.show_dividends }
 \vspace{2em}
 \section*{Overall - Dividends and Interests}
 \subsection*{Number of dividend distributions: \VAR{ dividend_count.value }}
@@ -246,5 +247,6 @@
 \subsection*{Total amount of foreign interests proceeds: £\VAR{ "{:,}".format(report.total_foreign_interest) }}
 \BLOCK{ if report.total_eri_amount(True) > 0 }
 \subsubsection*{   (including £\VAR{ "{:,}".format(round_decimal(report.total_eri_amount(True), 2))} from excess reported income distributions)}
+\BLOCK{ endif }
 \BLOCK{ endif }
 \end{document}

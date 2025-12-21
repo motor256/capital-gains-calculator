@@ -135,3 +135,6 @@ DEFAULT_ISIN_TRANSLATION_FILE: Final = DEFAULT_OUTPUT_FOLDER / "isin_translation
 DEFAULT_BROKER_TRANSACTIONS_FILE: Final = (
     DEFAULT_OUTPUT_FOLDER / "broker_transactions.csv"
 )
+
+# Historical stock prices cache
+DEFAULT_HISTORICAL_PRICES_FILE: Final = DEFAULT_OUTPUT_FOLDER / "historical_prices.csv"

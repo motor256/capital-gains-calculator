@@ -38,6 +38,7 @@ from .exceptions import (
     QuantityNotPositiveError,
     SymbolMissingError,
 )
+from .historical_price_fetcher import HistoricalPriceFetcher
 from .initial_prices import InitialPrices
 from .isin_converter import IsinConverter
 from .model import (
@@ -157,6 +158,7 @@ class CapitalGainsCalculator:
         interest_fund_tickers: list[str],
         balance_check: bool = True,
         calc_unrealized_gains: bool = False,
+        show_dividends: bool = True,
     ):
         """Create calculator object."""
         self.tax_year = tax_year
@@ -171,6 +173,7 @@ class CapitalGainsCalculator:
         self.initial_prices = initial_prices
         self.balance_check = balance_check
         self.calc_unrealized_gains = calc_unrealized_gains
+        self.show_dividends = show_dividends
         self.interest_fund_tickers = interest_fund_tickers
         self.total_uk_interest = Decimal(0)
         self.total_foreign_interest = Decimal(0)
@@ -1360,6 +1363,7 @@ class CapitalGainsCalculator:
             round_decimal(self.total_uk_interest, 2),
             round_decimal(self.total_foreign_interest, 2),
             show_unrealized_gains=self.calc_unrealized_gains,
+            show_dividends=self.show_dividends,
         )
 
     def make_portfolio_entry(
@@ -1386,6 +1390,9 @@ class CapitalGainsCalculator:
 
 def calculate_cgt(args: argparse.Namespace) -> None:
     """Perform all the computations."""
+    # Create historical price fetcher for stock split normalization
+    historical_price_fetcher = HistoricalPriceFetcher(args.historical_prices_file)
+
     # Read data from input files
     broker_transactions = read_broker_transactions(
         freetrade_transactions_file=args.freetrade_file,
@@ -1398,6 +1405,7 @@ def calculate_cgt(args: argparse.Namespace) -> None:
         raw_transactions_file=args.raw_file,
         vanguard_transactions_file=args.vanguard_file,
         eri_raw_file=args.eri_raw_file,
+        historical_price_fetcher=historical_price_fetcher,
     )
 
     # Optionally save parsed broker transactions to CSV
@@ -1420,6 +1428,7 @@ def calculate_cgt(args: argparse.Namespace) -> None:
         args.interest_fund_tickers,
         balance_check=args.balance_check,
         calc_unrealized_gains=args.calc_unrealized_gains,
+        show_dividends=args.show_dividends,
     )
     # First pass converts broker transactions to HMRC transactions.
     # This means applying same day rule and collapsing all transactions with

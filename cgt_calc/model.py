@@ -381,6 +381,7 @@ class CapitalGainsReport:
     total_uk_interest: Decimal
     total_foreign_interest: Decimal
     show_unrealized_gains: bool
+    show_dividends: bool = True
 
     def _filter_calculation_log(
         self, calculation_log: CalculationLog, rule_type: RuleType
