@@ -18,6 +18,7 @@ from dataclasses import InitVar, dataclass
 import datetime
 from decimal import Decimal
 import json
+from cgt_calc import stock_prices
 import logging
 from typing import TYPE_CHECKING, Any, Final
 
@@ -33,6 +34,7 @@ OPTIONAL_DETAILS_NAME: Final = "Details"
 FIELD_TO_SCHEMA: Final = {"transactions": 1, "Transactions": 2}
 LOGGER = logging.getLogger(__name__)
 GOOGLE_SYMBOLS = {"GOOG", "GOOGL"}
+NVIDIA_SYMBOLS = {"NVDA"}  # m256tr: Added NVIDIA symbols
 
 
 @dataclass
@@ -58,6 +60,10 @@ class FieldNames:
     award_id: str = "AwardId"
     date: str = "Date"
     sale_price: str = "SalePrice"
+    purchase_fair_market_value: str = "PurchaseFairMarketValue"  # m256tr: field required ESPP processing
+    purchase_date: str = "PurchaseDate"  # m256tr: field required ESPP processing
+    subscription_date: str = "SubscriptionDate"  # m256tr: field required ESPP processing
+
 
     def __post_init__(self, schema_version: int) -> None:
         """Set correct field names if the schema is not the default one.
@@ -152,6 +158,10 @@ def action_from_str(label: str, file: Path) -> ActionType:
     if label == "Wire Funds Received":
         return ActionType.WIRE_FUNDS_RECEIVED
 
+    if label == "Lapse":  # m256tr
+        return ActionType.OTHER
+
+
     raise ParsingError(file, f"Unknown action: {label}")
 
 
@@ -161,6 +171,10 @@ def _decimal_from_str(price_str: str) -> Decimal:
     Remove $ sign, and comma thousand separators so as to handle dollar amounts
     such as "$1,250.00".
     """
+
+    if price_str == "":  # m256tr: handle empty price string
+        price_str = "0"
+
     return Decimal(price_str.replace("$", "").replace(",", ""))
 
 
@@ -192,7 +206,7 @@ def _is_integer(number: Decimal) -> bool:
 class SchwabTransaction(BrokerTransaction):
     """Represent single Schwab transaction."""
 
-    def __init__(self, row: JsonRowType, file: Path, field_names: FieldNames) -> None:
+    def __init__(self, row: JsonRowType, file: Path, field_names: FieldNames, nvda_prices) -> None:
         """Create a new SchwabTransaction from a JSON row."""
         names = field_names
         description = row[names.description]
@@ -200,13 +214,14 @@ class SchwabTransaction(BrokerTransaction):
         action = action_from_str(self.raw_action, file)
         symbol = row.get(names.symbol)
         symbol = TICKER_RENAMES.get(symbol, symbol)
-        if symbol not in GOOGLE_SYMBOLS:
+        if symbol not in (GOOGLE_SYMBOLS|NVIDIA_SYMBOLS):  # m256tr: handle NVIDIA symbols
             LOGGER.warning(
-                "The Schwab Equity Award JSON parser was only tested for Google stocks (%s), "
+                "The Schwab Equity Award JSON parser was only tested for Google and NVIDIA stocks (%s), "
                 "but found symbol '%s'. Please check the parsing and output are correct!",
-                ", ".join(GOOGLE_SYMBOLS),
+                ", ".join(GOOGLE_SYMBOLS | NVIDIA_SYMBOLS),
                 symbol,
             )
+
         quantity = _decimal_from_number_or_str(row, names.quantity)
         initially_parsed_amount = _decimal_from_number_or_str(row, names.amount)
         amount = initially_parsed_amount
@@ -222,25 +237,44 @@ class SchwabTransaction(BrokerTransaction):
                 details = row[names.transac_details][0]["Details"]
             else:
                 details = row[names.transac_details][0]
-            date = datetime.datetime.strptime(
-                details[names.vest_date], "%m/%d/%Y"
-            ).date()
-            # Schwab only provide this one as string:
-            price = _decimal_from_str(details[names.vest_fair_market_value])
-            if amount == Decimal(0):
-                amount = price * quantity
-            description = (
-                f"Vest from Award Date "
-                f"{details[names.award_date]} "
-                f"(ID {details[names.award_id]})"
-            )
+            #  m256tr: added handling for ESPP transactions
+            if description == "ESPP":
+                date = datetime.datetime.strptime(
+                    details[names.purchase_date], "%m/%d/%Y"
+                ).date()
+                # Schwab only provide this one as string:
+                price = _decimal_from_str(details[names.purchase_fair_market_value])
+                if amount == Decimal(0):
+                    amount = price * quantity
+                description = (
+                    f"ESPP from Subscription Date "
+                    f"{details[names.subscription_date]} "
+                )
+            else:
+                date = datetime.datetime.strptime(
+                    details[names.vest_date], "%m/%d/%Y"
+                ).date()
+                # Schwab only provide this one as string:
+                price = _decimal_from_str(details[names.vest_fair_market_value])
+                if amount == Decimal(0):
+                    amount = price * quantity
+                description = (
+                    f"Vest from Award Date "
+                    f"{details[names.award_date]} "
+                    f"(ID {details[names.award_id]})"
+                )
         elif row[names.action] == "Sale":
             date = datetime.datetime.strptime(row[names.date], "%m/%d/%Y").date()
 
             # Schwab's data export sometimes lacks decimals on Sales
             # quantities, in which case we infer it from number of shares in
             # sub-transactions, or failing that from the amount and salePrice.
-            if not _is_integer(quantity):
+
+            # m256tr: For NVDA it seems that quantity of sale will always be an integer. 
+            # Added it as the first condition for a quick escape path. To be optimized / merged into main flow later.
+            if symbol in NVIDIA_SYMBOLS and _is_integer(quantity):
+                price = (amount + fees) / quantity
+            elif not _is_integer(quantity):
                 price = (amount + fees) / quantity
             else:
                 subtransac_have_quantities = True
@@ -333,6 +367,8 @@ class SchwabTransaction(BrokerTransaction):
 
         if symbol in GOOGLE_SYMBOLS:
             self._normalize_google_split()
+        elif symbol in NVIDIA_SYMBOLS:
+            self._normalize_nvidia_split(nvda_prices)
 
     def _normalize_google_split(self) -> None:
         """Ensure past transactions are normalized to split values.
@@ -357,9 +393,38 @@ class SchwabTransaction(BrokerTransaction):
             self.price = round_decimal(self.price / split_factor, ROUND_DIGITS)
             self.quantity = round_decimal(self.quantity * split_factor, ROUND_DIGITS)
 
+    # m256tr: Added NVIDIA split handling
+    # TODO - this code is not great - requires cleanup and possibly different approach. nvda_prices passthrough is not good.
+    def _normalize_nvidia_split(self, nvda_prices) -> None:
+        """Ensure past transactions are normalized to split values.
+
+        Takes into account the latest NVDA stock split: 2024-06-10 - 10:1 (from ~$1,208 to ~$120)
+        The stock split before that (2021-07-20 - 4:1) seems to be already accounted for in Schwab data export.
+
+        Schwab's data exports have some past transactions corrected for the splits, whereas others are not. That's
+        why we fetch historical stock prices from yfinance and check if transaction was already corrected and correct
+        of not
+        """
+        split_factor = 10
+        fetched_price = Decimal(
+            str(stock_prices.fetch_closest_close_price(nvda_prices, self.date.strftime('%Y-%m-%d'))))
+        if (
+            self.date <= datetime.date(2024, 6, 10)
+            and self.price
+            and self.price > fetched_price * split_factor / Decimal('2')
+            and self.quantity
+        ):
+            self.price = round_decimal(self.price / split_factor, ROUND_DIGITS)
+            self.quantity = round_decimal(self.quantity * split_factor, ROUND_DIGITS)
+            if (self.price / fetched_price > Decimal('1.2')) or (self.price / fetched_price < Decimal('0.8')):
+                raise Exception(
+                    f"Split processing errors: updated price {self.price} differs too much from {fetched_price}. Date: {self.date}")
+
+
 
 def read_schwab_equity_award_json_transactions(
     transactions_file: Path,
+    nvda_prices,  # m256tr: passthrough, to be removed later
 ) -> list[BrokerTransaction]:
     """Read Schwab transactions from file."""
 
@@ -392,10 +457,10 @@ def read_schwab_equity_award_json_transactions(
             )
 
         transactions = [
-            SchwabTransaction(transac, transactions_file, fields)
+            SchwabTransaction(transac, transactions_file, fields, nvda_prices)
             for transac in data[fields.transactions]
             # Skip as not relevant for CGT
-            if transac[fields.action] not in {"Journal", "Wire Transfer"}
+            if transac[fields.action] not in {"Journal", "Wire Transfer", "Lapse", "Tax Withholding", "Dividend"}  # m256tr: added Lapse, Tax Withholding, Dividend to the list of actions to skip  
         ]
         transactions.reverse()
         return list(transactions)

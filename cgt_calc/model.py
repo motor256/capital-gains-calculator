@@ -154,6 +154,7 @@ class ActionType(Enum):
     STOCK_SPLIT = 15
     CASH_MERGER = 16
     EXCESS_REPORTED_INCOME = 17
+    OTHER = 18  # m256tr: For actions that can be ignored, for example "LAPSE"
 
 
 class CalculationType(Enum):

@@ -462,7 +462,7 @@ warn_unreachable = true
 
 [tool.codespell]
 quiet-level = 2
-skip = "uv.lock,./.git/*,./.mypy_cache/*,./.pytest_cache/*,./.ruff_cache/*,./.venv/*,./dist/*,*.csv,./env/*,./out/*"
+skip = "uv.lock,./.git/*,./.mypy_cache/*,./.pytest_cache/*,./.ruff_cache/*,./.venv/*,./dist/*,*.csv,./env/*,./out/*,./in/*"
 
 [tool.pytest.ini_options]
 addopts = "-vv -n auto"
