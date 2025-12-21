@@ -70,7 +70,12 @@ def get_closest_price(symbol: str, target_date: str | date) -> Decimal:
 
 def _fetch_price_data(ticker: str, start_date: str, end_date: str) -> pd.DataFrame:
     """Fetch historical price data from yfinance."""
-    stock_data: pd.DataFrame = yf.download(ticker, start=start_date, end=end_date)
+    stock_data: pd.DataFrame = yf.download(
+        ticker,
+        start=start_date,
+        end=end_date,
+        auto_adjust=True,
+    )
     if stock_data.empty:
         msg = f"No data found for ticker '{ticker}' from {start_date} to {end_date}."
         raise RuntimeError(msg)
