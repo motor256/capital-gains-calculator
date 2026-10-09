@@ -19,6 +19,7 @@ from .args_parser import (
 from .currency_converter import CurrencyConverter
 from .current_price_fetcher import CurrentPriceFetcher
 from .exceptions import CgtError, TransactionDumpError
+from .fork import options as fork_options  # FORK: see FORK.md
 from .isin_converter import IsinConverter
 from .logging import setup_logging, style_text
 from .parsers.broker_registry import BrokerRegistry
@@ -120,6 +121,8 @@ def calculate_cgt(args: argparse.Namespace) -> None:
     from .main import CapitalGainsCalculator  # noqa: PLC0415
 
     isin_translation_file = args.isin_translation_file
+
+    fork_options.apply_arguments(args)  # FORK: see FORK.md, before any file is read
 
     # Read data from input files
     isin_converter = IsinConverter(isin_translation_file)

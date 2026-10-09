@@ -29,6 +29,7 @@ from .const import (
     EARLIEST_TAX_YEAR,
 )
 from .dates import get_tax_year_end, get_tax_year_for_date, get_tax_year_start
+from .fork import options as fork_options  # FORK: see FORK.md
 from .parsers.broker_registry import BrokerRegistry
 
 
@@ -275,6 +276,7 @@ Documentation: https://cgt-calc.uk/
         action="store_true",
         help="show debug messages, and a full traceback if the calculation fails",
     )
+    fork_options.add_arguments(parser)  # FORK: see FORK.md
     return parser
 
 

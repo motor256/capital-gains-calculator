@@ -30,6 +30,7 @@ import logging
 from typing import TYPE_CHECKING, Any, Final, TextIO, override
 
 from cgt_calc.exceptions import ParsingError, UnexpectedColumnCountError
+from cgt_calc.fork import split_units as fork_split_units  # FORK: see FORK.md
 from cgt_calc.model import (
     ActionType,
     BrokerTransaction,
@@ -1185,7 +1186,15 @@ class SchwabAwardTransaction(BrokerTransaction):
         if history is None:
             return
         if history.restatement is Restatement.ACQUISITIONS_ONLY:
-            self._convert_disposal_to_current_units()
+            # FORK: with --infer-split-units the row's own price says which
+            # units it is in. Everything else falls through to upstream.
+            fork_multiplier = fork_split_units.multiplier_for(
+                self, history.splits, file
+            )
+            if fork_multiplier is not None:
+                self._rescale(fork_multiplier)
+            else:
+                self._convert_disposal_to_current_units()
         else:
             self._convert_row_priced_before_a_split(history)
 
@@ -1666,7 +1675,10 @@ class SchwabEquityAwardsParser(BaseSingleFileParser[SchwabAwardTransaction]):
 
         # Before anything is converted: the split table has to survive the one
         # record that can contradict it.
-        _check_lapse_units(rows, file_path, fields)
+        # FORK: this check assumes upstream's reading of the units, which
+        # --infer-split-units replaces, so it has nothing to check there.
+        if not fork_split_units.enabled():
+            _check_lapse_units(rows, file_path, fields)
 
         transactions = [
             _csv_aware_transaction(transac, file_path, fields)
